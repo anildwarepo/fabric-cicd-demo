@@ -1,0 +1,241 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "name": "Copy customer demographics to SQL",
+        "type": "Copy",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "typeProperties": {
+          "source": {
+            "type": "DelimitedTextSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": false,
+              "wildcardFileName": {
+                "value": "@pipeline().libraryVariables.SourceFilePattern",
+                "type": "Expression"
+              },
+              "enablePartitionDiscovery": false
+            },
+            "formatSettings": {
+              "type": "DelimitedTextReadSettings"
+            },
+            "datasetSettings": {
+              "annotations": [],
+              "type": "DelimitedText",
+              "schema": [],
+              "typeProperties": {
+                "location": {
+                  "type": "AzureBlobFSLocation",
+                  "fileSystem": {
+                    "value": "@pipeline().libraryVariables.SourceFileSystem",
+                    "type": "Expression"
+                  },
+                  "folderPath": {
+                    "value": "@pipeline().libraryVariables.SourceFolderPath",
+                    "type": "Expression"
+                  }
+                },
+                "columnDelimiter": "|",
+                "rowDelimiter": "\n",
+                "encodingName": "UTF-8",
+                "quoteChar": "",
+                "escapeChar": "",
+                "firstRowAsHeader": false,
+                "nullValue": ""
+              },
+              "externalReferences": {
+                "connection": "@pipeline().libraryVariables.SourceConnectionId"
+              }
+            }
+          },
+          "sink": {
+            "type": "FabricSqlDatabaseSink",
+            "writeBehavior": "insert",
+            "sqlWriterUseTableLock": false,
+            "preCopyScript": {
+              "value": "@concat('IF EXISTS (SELECT 1 FROM [', replace(pipeline().libraryVariables.DestinationSchema, ']', ']]'), '].[', replace(pipeline().libraryVariables.DestinationTable, ']', ']]'), ']) THROW 50001, ''Destination is not empty. No rows were overwritten; review the existing load before rerunning.'', 1;')",
+              "type": "Expression"
+            },
+            "datasetSettings": {
+              "annotations": [],
+              "connectionSettings": {
+                "name": "CustomerDemographicsSqlDatabase",
+                "properties": {
+                  "annotations": [],
+                  "type": "FabricSqlDatabase",
+                  "typeProperties": {
+                    "workspaceId": "@pipeline().libraryVariables.DestinationWorkspaceId",
+                    "artifactId": "@pipeline().libraryVariables.DestinationDatabaseId"
+                  },
+                  "externalReferences": {
+                    "connection": "@pipeline().libraryVariables.DestinationConnectionId"
+                  }
+                }
+              },
+              "type": "FabricSqlDatabaseTable",
+              "schema": [],
+              "typeProperties": {
+                "schema": {
+                  "value": "@pipeline().libraryVariables.DestinationSchema",
+                  "type": "Expression"
+                },
+                "table": {
+                  "value": "@pipeline().libraryVariables.DestinationTable",
+                  "type": "Expression"
+                }
+              }
+            }
+          },
+          "enableStaging": false,
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "ordinal": 1
+                },
+                "sink": {
+                  "name": "cd_demo_sk",
+                  "type": "Int32"
+                }
+              },
+              {
+                "source": {
+                  "ordinal": 2
+                },
+                "sink": {
+                  "name": "cd_gender",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "ordinal": 3
+                },
+                "sink": {
+                  "name": "cd_marital_status",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "ordinal": 4
+                },
+                "sink": {
+                  "name": "cd_education_status",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "ordinal": 5
+                },
+                "sink": {
+                  "name": "cd_purchase_estimate",
+                  "type": "Int32"
+                }
+              },
+              {
+                "source": {
+                  "ordinal": 6
+                },
+                "sink": {
+                  "name": "cd_credit_rating",
+                  "type": "String"
+                }
+              },
+              {
+                "source": {
+                  "ordinal": 7
+                },
+                "sink": {
+                  "name": "cd_dep_count",
+                  "type": "Int32"
+                }
+              },
+              {
+                "source": {
+                  "ordinal": 8
+                },
+                "sink": {
+                  "name": "cd_dep_employed_count",
+                  "type": "Int32"
+                }
+              },
+              {
+                "source": {
+                  "ordinal": 9
+                },
+                "sink": {
+                  "name": "cd_dep_college_count",
+                  "type": "Int32"
+                }
+              }
+            ],
+            "typeConversion": true,
+            "typeConversionSettings": {
+              "allowDataTruncation": false,
+              "treatBooleanAsNumber": false
+            }
+          }
+        }
+      }
+    ],
+    "libraryVariables": {
+      "SourceConnectionId": {
+        "type": "String",
+        "variableName": "SourceConnectionId",
+        "libraryName": "CustomerDemographicsConfig"
+      },
+      "SourceFileSystem": {
+        "type": "String",
+        "variableName": "SourceFileSystem",
+        "libraryName": "CustomerDemographicsConfig"
+      },
+      "SourceFolderPath": {
+        "type": "String",
+        "variableName": "SourceFolderPath",
+        "libraryName": "CustomerDemographicsConfig"
+      },
+      "SourceFilePattern": {
+        "type": "String",
+        "variableName": "SourceFilePattern",
+        "libraryName": "CustomerDemographicsConfig"
+      },
+      "DestinationConnectionId": {
+        "type": "String",
+        "variableName": "DestinationConnectionId",
+        "libraryName": "CustomerDemographicsConfig"
+      },
+      "DestinationWorkspaceId": {
+        "type": "String",
+        "variableName": "DestinationWorkspaceId",
+        "libraryName": "CustomerDemographicsConfig"
+      },
+      "DestinationDatabaseId": {
+        "type": "String",
+        "variableName": "DestinationDatabaseId",
+        "libraryName": "CustomerDemographicsConfig"
+      },
+      "DestinationSchema": {
+        "type": "String",
+        "variableName": "DestinationSchema",
+        "libraryName": "CustomerDemographicsConfig"
+      },
+      "DestinationTable": {
+        "type": "String",
+        "variableName": "DestinationTable",
+        "libraryName": "CustomerDemographicsConfig"
+      }
+    },
+    "annotations": []
+  }
+}

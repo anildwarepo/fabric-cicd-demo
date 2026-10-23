@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "DataPipeline",
+    "displayName": "CopyCustomerDemographics",
+    "description": "Copy the four TPC-DS customer demographics files from ADLS Gen2 into the workspace SQL database."
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "6421f507-5bbb-9bf7-4b30-8d12e83435e1"
+  }
+}
