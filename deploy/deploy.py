@@ -4,8 +4,10 @@ Publishing runs in two phases because fabric-cicd publishes VariableLibrary item
 before Lakehouse and SQLDatabase items, and $items.* parameter references only
 resolve to items that already exist in the target workspace.
 
-    1. Infrastructure: Lakehouse, SQLDatabase (the SQL project creates the schema).
-    2. Content: VariableLibrary, Notebook, DataPipeline (rebound to phase 1 items).
+    1.  Infrastructure: Lakehouse, SQLDatabase (fabric-cicd creates them as shells).
+    1b. SQL schema: each SQL project is deployed with the Fabric updateDefinition
+        API (sqlproj format), because fabric-cicd does not publish SQL definitions.
+    2.  Content: VariableLibrary, Notebook, DataPipeline (rebound to phase 1 items).
 
 After publishing, the deployed definitions are read back and the run fails if any
 item still references an ID outside the target workspace.
@@ -220,28 +222,76 @@ class FabricClient:
             raise DeploymentError(f"{method} {url} returned {response.status_code}: {response.text[:500]}")
         return response
 
+    def wait(self, response, description):
+        """Wait for a Fabric long-running operation and return its final response."""
+        if response.status_code != 202:
+            return response
+        location = response.headers["Location"]
+        deadline = time.monotonic() + 1200
+        while True:
+            time.sleep(int(response.headers.get("Retry-After", "5")))
+            response = self.request("GET", location)
+            body = response.json()
+            status = body.get("status")
+            if status == "Succeeded":
+                return response
+            if status in {"Failed", "Cancelled"}:
+                raise DeploymentError(f"{description} ended with status {status}: {json.dumps(body.get('error', body))[:1500]}")
+            if time.monotonic() > deadline:
+                raise DeploymentError(f"{description} did not finish within 20 minutes.")
+
     def definition(self, workspace_id, item_id, definition_format=None):
         url = f"{FABRIC_API}/workspaces/{workspace_id}/items/{item_id}/getDefinition"
         if definition_format:
             url += f"?format={definition_format}"
         response = self.request("POST", url)
         if response.status_code == 202:
-            location = response.headers["Location"]
-            deadline = time.monotonic() + 600
-            while True:
-                time.sleep(int(response.headers.get("Retry-After", "5")))
-                response = self.request("GET", location)
-                status = response.json().get("status")
-                if status == "Succeeded":
-                    response = self.request("GET", f"{location.rstrip('/')}/result")
-                    break
-                if status in {"Failed", "Cancelled"} or time.monotonic() > deadline:
-                    raise DeploymentError(f"getDefinition for {item_id} ended with status {status}.")
+            location = self.wait(response, f"getDefinition for {item_id}").url
+            response = self.request("GET", f"{location.rstrip('/')}/result")
         return {
             part["path"]: base64.b64decode(part["payload"]).decode("utf-8-sig", errors="replace")
             for part in response.json()["definition"]["parts"]
             if part["path"] != ".platform"
         }
+
+
+def deploy_sql_schema(args, credential):
+    """Deploy each SQL database's schema from its SQL project.
+
+    fabric-cicd publishes SQLDatabase items as shells (no definition), so the schema
+    is applied here with the Fabric updateDefinition API in sqlproj format. Fabric
+    builds the project and applies a differential update; existing data is kept.
+    """
+    print("\n=== Phase 1b: deploying SQL database schemas (sqlproj) ===", flush=True)
+    client = FabricClient(credential)
+    workspace_id = args.workspace_id.lower()
+    deployed = client.request("GET", f"{FABRIC_API}/workspaces/{workspace_id}/items").json()["value"]
+    by_key = {(item["type"], item["displayName"]): item["id"] for item in deployed}
+    for (item_type, name), folder in repository_items(args.repository_directory).items():
+        if item_type != "SQLDatabase":
+            continue
+        if (item_type, name) not in by_key:
+            raise DeploymentError(f"SQLDatabase '{name}' does not exist in the target workspace after phase 1.")
+        parts = [
+            {
+                "path": path.relative_to(folder).as_posix(),
+                "payload": base64.b64encode(path.read_bytes()).decode(),
+                "payloadType": "InlineBase64",
+            }
+            for path in content_files(folder)
+            if path.relative_to(folder).as_posix() != ".gitignore"
+        ]
+        projects = [part["path"] for part in parts if part["path"].endswith(".sqlproj")]
+        if len(projects) != 1:
+            raise DeploymentError(f"SQLDatabase '{name}' must contain exactly one .sqlproj file; found {projects}.")
+        print(f"  Deploying '{name}' schema from {len(parts)} file(s): {', '.join(p['path'] for p in parts)}", flush=True)
+        response = client.request(
+            "POST",
+            f"{FABRIC_API}/workspaces/{workspace_id}/items/{by_key[(item_type, name)]}/updateDefinition",
+            json={"definition": {"format": "sqlproj", "parts": parts}},
+        )
+        client.wait(response, f"Schema deployment for SQLDatabase '{name}'")
+        print(f"  Deployed schema for SQLDatabase '{name}'", flush=True)
 
 
 def verify(args, credential):
@@ -348,6 +398,7 @@ def main():
 
         credential = AzureCliCredential()
         publish("1/2", INFRASTRUCTURE_TYPES, args, credential)
+        deploy_sql_schema(args, credential)
         publish("2/2", CONTENT_TYPES, args, credential)
         verify(args, credential)
     except DeploymentError as error:

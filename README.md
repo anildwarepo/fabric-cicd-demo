@@ -101,7 +101,7 @@ anildwa-dev-workspace --(Fabric Source control: Commit)--> branch anildwa-fabric
 | File | Purpose |
 |---|---|
 | [deploy/azure-pipelines-uat.yml](./deploy/azure-pipelines-uat.yml) | Azure Pipeline `fabric-cicd-deploy-uat`; triggered by commits to `uat` |
-| [deploy/deploy.py](./deploy/deploy.py) | Static check, two-phase publish, and post-deploy verification |
+| [deploy/deploy.py](./deploy/deploy.py) | Static check, phased publish (including SQL schema), and post-deploy verification |
 | [deploy/parameter.yml](./deploy/parameter.yml) | Rewrites Dev IDs to the UAT workspace and its deployed items |
 | [deploy/requirements.txt](./deploy/requirements.txt) | Pinned deployment dependencies |
 
@@ -121,9 +121,14 @@ anildwa-dev-workspace --(Fabric Source control: Commit)--> branch anildwa-fabric
 - **Validate** (no credentials): fails if a `parameter.yml` entry no longer matches
   the repository, or if any item contains an ID that is not rewritten, so a Dev
   reference cannot leak into UAT.
-- **Deploy to UAT**, phase 1: publishes `Lakehouse` and `SQLDatabase`. The SQL
-  project deploys the schema (for example `dbo.customer_demographics`); existing
-  UAT data is preserved. Lakehouse data is never copied or overwritten.
+- **Deploy to UAT**, phase 1: publishes `Lakehouse` and `SQLDatabase`. fabric-cicd
+  creates these as shells; lakehouse data is never copied or overwritten.
+- **Deploy to UAT**, phase 1b: deploys each SQL project (for example
+  `dbo.customer_demographics`) with the Fabric `updateDefinition` API in `sqlproj`
+  format, because fabric-cicd 1.4.0 does not publish SQL database definitions.
+  Fabric builds the project and applies a differential update; existing UAT data
+  is kept. If Fabric rejects a change that would lose data, the run fails and the
+  change must be applied manually.
 - **Deploy to UAT**, phase 2: publishes `VariableLibrary`, `Notebook`, and
   `DataPipeline`. The two phases exist because fabric-cicd publishes variable
   libraries first, and `$items` references resolve only to items that already
