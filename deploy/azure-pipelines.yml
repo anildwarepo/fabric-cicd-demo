@@ -46,7 +46,7 @@ variables:
         value: 'UAT'
   - ${{ if eq(variables['Build.SourceBranchName'], 'prod') }}:
       - name: targetWorkspaceId
-        value: '__PROD_WORKSPACE_ID__'                  # anildwa-prod-workspace
+        value: '8dc36b95-b78f-4f4a-8edd-09d8d6e10fca'   # anildwa-prod-workspace
       - name: serviceConnection
         value: 'fabric-cicd-prod'
       - name: approvalEnvironment
