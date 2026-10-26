@@ -95,6 +95,9 @@ counts, and 20-row preview; open the notebook's run history to inspect them.
 
 ## CI/CD: promote to UAT and Prod with fabric-cicd
 
+For the design, diagrams, and lessons learned (value sets, activation, when to use
+`parameter.yml`), see the [Fabric CI/CD design guide](./docs/fabric-cicd-design.md).
+
 Items are promoted from Git by one Azure Pipeline that uses the
 [fabric-cicd](https://microsoft.github.io/fabric-cicd/) library. Each environment has
 its own workspace, lakehouse, and SQL database. Only the Dev workspace is connected to

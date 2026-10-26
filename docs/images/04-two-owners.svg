@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1510 690" font-family="Segoe UI, Arial, sans-serif" role="img" aria-labelledby="title-04-two-owners">
+<title id="title-04-two-owners">Who owns the environment values? Two owners vs one owner</title>
+<defs>
+<filter id="shadow" x="-4%" y="-4%" width="108%" height="112%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.15"/></filter>
+<filter id="shadowLg" x="-2%" y="-4%" width="104%" height="112%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-opacity="0.12"/></filter>
+<marker id="arrow" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M1 1 L10 6 L1 11 Z" fill="#94a3b8"/></marker>
+<marker id="arrowStart" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto"><path d="M11 1 L2 6 L11 11 Z" fill="#94a3b8"/></marker>
+<linearGradient id="grad-dc2626" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#dc2626"/><stop offset="1" stop-color="#dc2626" stop-opacity="0.85"/></linearGradient>
+<linearGradient id="grad-059669" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#059669"/><stop offset="1" stop-color="#059669" stop-opacity="0.85"/></linearGradient>
+<g id="icon-ado"><defs><linearGradient id="ado-ba420277" x1="9" y1="16.97" x2="9" y2="1.03" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0078d4" /><stop offset="0.16" stop-color="#1380da" /><stop offset="0.53" stop-color="#3c91e5" /><stop offset="0.82" stop-color="#559cec" /><stop offset="1" stop-color="#5ea0ef" /></linearGradient></defs><path id="ado-a91f0ca4" d="M17,4v9.74l-4,3.28-6.2-2.26V17L3.29,12.41l10.23.8V4.44Zm-3.41.49L7.85,1V3.29L2.58,4.84,1,6.87v4.61l2.26,1V6.57Z" fill="url(#ado-ba420277)" /></g>
+<g id="icon-varlib"><rect x="1" y="1.5" width="16" height="15" rx="2" fill="#7c3aed"/><path d="M5.2 4.6c-1.3 0-1.3.9-1.3 1.8 0 .8-.4 1.6-1.1 2.1.7.5 1.1 1.3 1.1 2.1 0 .9 0 1.8 1.3 1.8" stroke="#fff" stroke-width="1" fill="none"/><path d="M12.8 4.6c1.3 0 1.3.9 1.3 1.8 0 .8.4 1.6 1.1 2.1-.7.5-1.1 1.3-1.1 2.1 0 .9 0 1.8-1.3 1.8" stroke="#fff" stroke-width="1" fill="none"/><path d="M7 6.2h4M7 8.6h4M7 11h4" stroke="#ddd6fe" stroke-width="1.2" stroke-linecap="round"/></g>
+</defs>
+<rect width="1510" height="690" rx="12" fill="#fafafa"/>
+<text x="755.0" y="38.0" font-size="20" font-weight="700" fill="#1e293b" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif">Who owns the environment values? Two owners vs one owner</text>
+<text x="755.0" y="60.0" font-size="12" font-weight="400" fill="#475569" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif">Value sets and parameter.yml can both set environment IDs. Using both for the same values overwrites the library in the target workspace.</text>
+<g filter="url(#shadowLg)">
+<rect x="50.0" y="85.0" width="685.0" height="505.0" rx="10" fill="#ffffff" stroke="#f87171" stroke-width="1.5"/>
+<rect x="50" y="85" width="685" height="28" rx="10" fill="url(#grad-dc2626)"/>
+<rect x="50" y="103" width="685" height="10" fill="url(#grad-dc2626)"/>
+</g>
+<text x="392.5" y="104.0" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif">ANTI-PATTERN  ·  value sets + unfiltered find_replace</text>
+<g filter="url(#shadowLg)">
+<rect x="775.0" y="85.0" width="685.0" height="505.0" rx="10" fill="#ffffff" stroke="#10b981" stroke-width="1.5"/>
+<rect x="775" y="85" width="685" height="28" rx="10" fill="url(#grad-059669)"/>
+<rect x="775" y="103" width="685" height="10" fill="url(#grad-059669)"/>
+</g>
+<text x="1117.5" y="104.0" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif">RECOMMENDED  ·  one owner per value</text>
+<rect x="70.0" y="128.0" width="645.0" height="92.0" rx="8" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="1.2" filter="url(#shadow)"/>
+<use href="#icon-varlib" xlink:href="#icon-varlib" transform="translate(82.0 140.0) scale(1.778)"/>
+<text x="126.0" y="150.0" font-size="12" font-weight="700" fill="#5b21b6" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Library in Git  (correct)</text>
+<text x="126.0" y="168.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Default value set: LakehouseId = &lt;Dev lakehouse ID&gt;</text>
+<text x="126.0" y="183.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">DEV value set: inherits Default (Dev)</text>
+<text x="126.0" y="198.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">UAT Value set: LakehouseId = &lt;UAT lakehouse ID&gt;</text>
+<rect x="70.0" y="260.0" width="645.0" height="92.0" rx="8" fill="#fef2f2" stroke="#f87171" stroke-width="1.2" filter="url(#shadow)"/>
+<use href="#icon-ado" xlink:href="#icon-ado" transform="translate(82.0 272.0) scale(1.778)"/>
+<text x="126.0" y="282.0" font-size="12" font-weight="700" fill="#991b1b" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">parameter.yml  —  find_replace with no filter</text>
+<text x="126.0" y="300.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">find_value: "&lt;Dev lakehouse ID&gt;"   →   uat: $items.Lakehouse.&lt;name&gt;.$id</text>
+<text x="126.0" y="315.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">No item_type / item_name / file_path, so it rewrites the ID</text>
+<text x="126.0" y="330.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">in EVERY file of EVERY item, including the variable library</text>
+<rect x="70.0" y="392.0" width="645.0" height="92.0" rx="8" fill="#fef2f2" stroke="#f87171" stroke-width="1.2" filter="url(#shadow)"/>
+<use href="#icon-varlib" xlink:href="#icon-varlib" transform="translate(82.0 404.0) scale(1.778)"/>
+<text x="126.0" y="414.0" font-size="12" font-weight="700" fill="#991b1b" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Library deployed to UAT  (broken)</text>
+<text x="126.0" y="432.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Default value set: LakehouseId = &lt;UAT lakehouse ID&gt;  (rewritten)</text>
+<text x="126.0" y="447.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">DEV value set: now shows UAT IDs</text>
+<text x="126.0" y="462.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Active: Default value set  (branch 'uat' ≠ 'UAT Value set')</text>
+<rect x="795.0" y="128.0" width="645.0" height="92.0" rx="8" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="1.2" filter="url(#shadow)"/>
+<use href="#icon-varlib" xlink:href="#icon-varlib" transform="translate(807.0 140.0) scale(1.778)"/>
+<text x="851.0" y="150.0" font-size="12" font-weight="700" fill="#5b21b6" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Library in Git</text>
+<text x="851.0" y="168.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Default value set: &lt;Dev IDs&gt;</text>
+<text x="851.0" y="183.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">uat: &lt;UAT IDs&gt;     prod: &lt;Prod IDs&gt;</text>
+<text x="851.0" y="198.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">settings.json: valueSetsOrder = ["uat", "prod"]</text>
+<rect x="795.0" y="260.0" width="645.0" height="92.0" rx="8" fill="#fffbeb" stroke="#fbbf24" stroke-width="1.2" filter="url(#shadow)"/>
+<use href="#icon-ado" xlink:href="#icon-ado" transform="translate(807.0 272.0) scale(1.778)"/>
+<text x="851.0" y="282.0" font-size="12" font-weight="700" fill="#78350f" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Pipeline: environment = branch = "uat"</text>
+<text x="851.0" y="300.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">No parameter.yml rule touches the variable library</text>
+<text x="851.0" y="315.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">parameter.yml only for IDs inside item definitions that</text>
+<text x="851.0" y="330.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">can't read the library, always filtered by item_type/name</text>
+<rect x="795.0" y="392.0" width="645.0" height="92.0" rx="8" fill="#ecfdf5" stroke="#10b981" stroke-width="1.2" filter="url(#shadow)"/>
+<use href="#icon-varlib" xlink:href="#icon-varlib" transform="translate(807.0 404.0) scale(1.778)"/>
+<text x="851.0" y="414.0" font-size="12" font-weight="700" fill="#065f46" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Library deployed to UAT  (correct)</text>
+<text x="851.0" y="432.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Default value set: &lt;Dev IDs&gt;  (unchanged)</text>
+<text x="851.0" y="447.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">uat: &lt;UAT IDs&gt;     prod: &lt;Prod IDs&gt;</text>
+<text x="851.0" y="462.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Active: uat  →  items read UAT IDs</text>
+<rect x="60.0" y="524.0" width="665.0" height="52.0" rx="8" fill="#fef2f2" stroke="#f87171" stroke-width="1.2" filter="url(#shadow)"/>
+<text x="74.0" y="546.0" font-size="12" font-weight="700" fill="#991b1b" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Result: Dev and UAT values look identical in UAT</text>
+<text x="74.0" y="564.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Two mechanisms set the same values; the broadest rule wins.</text>
+<rect x="785.0" y="524.0" width="665.0" height="52.0" rx="8" fill="#ecfdf5" stroke="#10b981" stroke-width="1.2" filter="url(#shadow)"/>
+<text x="799.0" y="546.0" font-size="12" font-weight="700" fill="#065f46" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Result: each workspace uses its own value set</text>
+<text x="799.0" y="564.0" font-size="10" font-weight="400" fill="#334155" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">One owner: value sets. Git shows every environment's IDs.</text>
+<text x="50.0" y="624.0" font-size="10" font-weight="700" fill="#475569" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">LEGEND:</text>
+<rect x="112.0" y="613.0" width="14.0" height="14.0" rx="3" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.2"/>
+<text x="132.0" y="624.0" font-size="10" font-weight="400" fill="#475569" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Variable library</text>
+<rect x="220.5" y="613.0" width="14.0" height="14.0" rx="3" fill="#fffbeb" stroke="#d97706" stroke-width="1.2"/>
+<text x="240.5" y="624.0" font-size="10" font-weight="400" fill="#475569" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Azure Pipelines</text>
+<rect x="330.2" y="613.0" width="14.0" height="14.0" rx="3" fill="#fef2f2" stroke="#dc2626" stroke-width="1.2"/>
+<text x="350.2" y="624.0" font-size="10" font-weight="400" fill="#475569" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Problem</text>
+<rect x="409.2" y="613.0" width="14.0" height="14.0" rx="3" fill="#ecfdf5" stroke="#059669" stroke-width="1.2"/>
+<text x="429.2" y="624.0" font-size="10" font-weight="400" fill="#475569" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Correct state</text>
+<line x1="507.734375" y1="620" x2="533.734375" y2="620" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="539.7" y="624.0" font-size="10" font-weight="400" fill="#475569" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Deployment flow</text>
+<use href="#icon-varlib" xlink:href="#icon-varlib" transform="translate(637.5 611.0) scale(1.000)"/>
+<text x="659.5" y="624.0" font-size="10" font-weight="400" fill="#475569" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Variable library (custom glyph)</text>
+<text x="50.0" y="652.0" font-size="10" font-weight="400" fill="#64748b" text-anchor="start" font-family="Segoe UI, Arial, sans-serif">Placeholders like &lt;Dev lakehouse ID&gt; stand for real GUIDs.</text>
+<!-- foreground: cross-layer arrows and labels -->
+<polyline points="392.0,222.0 392.0,256.0" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="392.0,354.0 392.0,388.0" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="1117.0,222.0 1117.0,256.0" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="1117.0,354.0 1117.0,388.0" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+</svg>
