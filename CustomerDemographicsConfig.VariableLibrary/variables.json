@@ -1,0 +1,79 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/variableLibrary/definition/variables/1.0.0/schema.json",
+  "variables": [
+    {
+      "name": "SourceConnectionId",
+      "note": "Existing OAuth ADLS Gen2 connection for anildwafabricadlsgen2/tpcdsdataset. Credentials stay in the connection.",
+      "type": "String",
+      "value": "2cae5b6b-3284-40b0-b415-b8fd3408a7b0"
+    },
+    {
+      "name": "SourceFileSystem",
+      "type": "String",
+      "value": "tpcdsdataset"
+    },
+    {
+      "name": "SourceFolderPath",
+      "type": "String",
+      "value": "1g/1g"
+    },
+    {
+      "name": "SourceFilePattern",
+      "note": "Matches customer_demographics_1_4.dat through customer_demographics_4_4.dat.",
+      "type": "String",
+      "value": "customer_demographics_*_4.dat"
+    },
+    {
+      "name": "DestinationConnectionId",
+      "note": "Existing FabricSql OAuth connection. Credentials stay in the connection.",
+      "type": "String",
+      "value": "21e5a909-570a-4967-bae4-c2e914d5a1a8"
+    },
+    {
+      "name": "DestinationWorkspaceId",
+      "note": "anildwa-dev-workspace",
+      "type": "String",
+      "value": "e2ebf2eb-f7df-42a3-b5e3-e033cf7d32c6"
+    },
+    {
+      "name": "DestinationDatabaseId",
+      "note": "wwi-importers",
+      "type": "String",
+      "value": "3e769b16-76c2-495c-83d8-fc02b53a0a7f"
+    },
+    {
+      "name": "DestinationSchema",
+      "type": "String",
+      "value": "dbo"
+    },
+    {
+      "name": "DestinationTable",
+      "type": "String",
+      "value": "customer_demographics"
+    },
+    {
+      "name": "SourceStorageAccount",
+      "note": "ADLS Gen2 account hosting the source data.",
+      "type": "String",
+      "value": "anildwafabricadlsgen2"
+    },
+    {
+      "name": "LakehouseWorkspaceId",
+      "note": "Workspace that owns CustomerDemographicsLakehouse.",
+      "type": "String",
+      "value": "e2ebf2eb-f7df-42a3-b5e3-e033cf7d32c6"
+    },
+    {
+      "name": "LakehouseId",
+      "note": "CustomerDemographicsLakehouse item ID.",
+      "type": "String",
+      "value": "8340a38b-0be0-4b4d-a360-6492cff7ae66"
+    },
+    {
+      "name": "LakehouseName",
+      "note": "Default lakehouse attached by the notebook's %%configure cell; same name in every environment.",
+      "type": "String",
+      "value": "CustomerDemographicsLakehouse"
+    }
+  ]
+}

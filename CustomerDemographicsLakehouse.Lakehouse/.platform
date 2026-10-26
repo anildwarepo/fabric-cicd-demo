@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Lakehouse",
+    "displayName": "CustomerDemographicsLakehouse",
+    "description": "Lakehouse for exploring the TPC-DS customer demographics ADLS source files."
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "cff7ae66-6492-a360-4b4d-0be08340a38b"
+  }
+}

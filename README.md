@@ -1,20 +1,208 @@
-# Introduction 
-TODO: Give a short introduction of your project. Let this section explain the objectives or the motivation behind this project. 
+# Fabric development workspace
 
-# Getting Started
-TODO: Guide users through getting your code up and running on their own system. In this section you can talk about:
-1.	Installation process
-2.	Software dependencies
-3.	Latest releases
-4.	API references
+Fabric item definitions for `anildwa-dev-workspace`.
 
-# Build and Test
-TODO: Describe and show how to build your code and run the tests. 
+## Customer demographics copy
 
-# Contribute
-TODO: Explain how other users and developers can contribute to make your code better. 
+[CopyCustomerDemographics](./CopyCustomerDemographics.DataPipeline/pipeline-content.json)
+copies the four TPC-DS files
+`customer_demographics_1_4.dat` through `customer_demographics_4_4.dat` from
+`https://anildwafabricadlsgen2.dfs.core.windows.net/tpcdsdataset/1g/1g/`
+into `wwi-importers.dbo.customer_demographics`.
 
-If you want to learn more about creating good readme files then refer the following [guidelines](https://docs.microsoft.com/en-us/azure/devops/repos/git/create-a-readme?view=azure-devops). You can also seek inspiration from the below readme files:
-- [ASP.NET Core](https://github.com/aspnet/Home)
-- [Visual Studio Code](https://github.com/Microsoft/vscode)
-- [Chakra Core](https://github.com/Microsoft/ChakraCore)
+The files have no header, use a pipe delimiter, and contain nine data fields
+followed by a trailing delimiter. Explicit ordinal mappings select only the nine
+data fields. Conversion errors fail the load instead of truncating or skipping
+data.
+
+### Shared configuration
+
+[CustomerDemographicsConfig](./CustomerDemographicsConfig.VariableLibrary/variables.json)
+holds the source connection, storage account, file system, folder and wildcard,
+the destination connection, workspace, SQL database item, schema and table, and
+the exploration lakehouse IDs. The pipeline binds its source and destination
+variables using `@pipeline().libraryVariables.<name>`; the notebook reads its
+configuration using `notebookutils.variableLibrary.getLibrary`.
+
+The library has one value set per environment. The **Default value set** holds the
+Dev values; the `uat` and `prod` value sets override every workspace, lakehouse,
+and SQL database ID with that environment's ID. Each workspace activates its own
+value set, so items read the right IDs without any change to their definitions
+(see CI/CD below). The connection IDs are tenant-level and shared by all
+environments. Credentials remain in Fabric connections, not in the variable
+library or Git.
+
+### Destination and execution
+
+Deploy the [table schema](./wwi-importers.SQLDatabase/dbo/Tables/customer_demographics.sql)
+before running the pipeline. Publish the variable library before the pipeline,
+and ensure the execution identity can use both referenced connections.
+
+The pipeline inserts into an empty destination table. A pre-copy check explicitly
+fails if the table already contains rows; it does not truncate, overwrite, or
+silently duplicate an earlier load. Automatic retries are disabled because a
+failed copy can leave committed batches. After a partial or completed load,
+review the destination before intentionally clearing or otherwise reconciling it
+for another run.
+
+Validate a run by checking that it read four files with no skipped rows and that
+the destination row count matches the source. The primary key on `cd_demo_sk`
+also enforces unique demographic keys.
+
+### Connection troubleshooting
+
+If a run fails with `DMTS_OAuthTokenRefreshFailedError` or `AADSTS700082`, open
+Fabric **Settings > Manage connections and gateways** and edit the exact
+connections referenced by the library:
+
+- `tpcdsdataset anildwa`: `2cae5b6b-3284-40b0-b415-b8fd3408a7b0`
+- `FabricSql anildwa`: `21e5a909-570a-4967-bae4-c2e914d5a1a8`
+
+Sign in again and save each connection. Signing into Fabric alone does not
+refresh a connection's stored OAuth credentials. If replacement connections are
+created instead, update their IDs in the variable library before rerunning.
+
+## Explore the source with Spark
+
+[ExploreCustomerDemographics](./ExploreCustomerDemographics.Notebook/notebook-content.py)
+is a PySpark notebook. Its first cell uses `%%configure` to attach
+[CustomerDemographicsLakehouse](./CustomerDemographicsLakehouse.Lakehouse/) as the
+default lakehouse, reading the lakehouse name, ID, and workspace ID from
+`CustomerDemographicsConfig`, so each environment attaches its own lakehouse.
+Open the notebook in Fabric and select **Run all**. It:
+
+1. Reads and displays the active source and lakehouse settings from
+   `CustomerDemographicsConfig`.
+2. Builds the ADLS `abfss://` source path from those values.
+3. Reads the matching `.dat` files with explicit TPC-DS column names and types,
+   failing on malformed records rather than silently inferring or discarding them.
+4. Displays per-file row counts, the total row count, and the first 20 rows ordered
+   by `cd_demo_sk`.
+5. Exposes the DataFrame as the session-local Spark SQL view
+   `customer_demographics_preview` and returns a JSON execution summary that
+   includes the attached default lakehouse.
+
+The notebook reads ADLS directly using its execution identity; it does not use
+the pipeline's stored OAuth connection, and it does not modify the SQL database
+or write a lakehouse table. The identity must have permission to read the source
+and the Spark session must have network access to the account. The attached
+lakehouse does not by itself grant access to external storage. No credentials,
+storage keys, or SAS tokens are stored in the notebook or variable library.
+
+The initial Spark validation completed successfully with four files and
+1,920,800 rows. Saved run snapshots retain the displayed configuration, per-file
+counts, and 20-row preview; open the notebook's run history to inspect them.
+
+## CI/CD: promote to UAT and Prod with fabric-cicd
+
+Items are promoted from Git by one Azure Pipeline that uses the
+[fabric-cicd](https://microsoft.github.io/fabric-cicd/) library. Each environment has
+its own workspace, lakehouse, and SQL database. Only the Dev workspace is connected to
+Git.
+
+```text
+anildwa-dev-workspace --(Fabric Source control: Commit)--> branch dev
+    --(pull request)--> branch uat  --(pipeline + UAT approval)-->  anildwa-uat-workspace
+    --(pull request)--> branch prod --(pipeline + PROD approval)--> anildwa-prod-workspace
+```
+
+| File | Purpose |
+|---|---|
+| [deploy/azure-pipelines.yml](./deploy/azure-pipelines.yml) | Azure Pipeline `fabric-cicd-deploy`; runs on commits to `uat` and `prod` |
+| [deploy/deploy.py](./deploy/deploy.py) | Static check, publish, SQL schema deployment, and verification |
+| [deploy/requirements.txt](./deploy/requirements.txt) | Pinned deployment dependencies |
+
+### How environment values work
+
+Environment-specific values live **only** in the variable library's value sets. No
+IDs are replaced during deployment, and there is no `parameter.yml`.
+
+| Value set | Used in | Holds |
+|---|---|---|
+| Default value set | `anildwa-dev-workspace` | Dev IDs |
+| `uat` | `anildwa-uat-workspace` | UAT IDs |
+| `prod` | `anildwa-prod-workspace` | Prod IDs |
+
+- The pipeline passes the branch name (`uat` or `prod`) to fabric-cicd, which
+  activates the value set with exactly that name. Names are case-sensitive; if no
+  value set matches, fabric-cicd would silently activate the Default value set, so
+  the static check fails instead.
+- The copy pipeline reads its IDs through `@pipeline().libraryVariables`, and the
+  notebook reads them with `notebookutils.variableLibrary` and `%%configure`. Neither
+  definition contains an ID.
+
+### Release a change
+
+1. Develop and test in `anildwa-dev-workspace`. If you add a workspace, lakehouse,
+   or SQL database ID to the library, add its UAT and Prod values to the `uat` and
+   `prod` value sets.
+2. In Fabric, open **Source control** and commit to `dev`.
+3. In Azure DevOps, create a pull request from `dev` into `uat` and complete it.
+   The pipeline validates, waits for approval on the **UAT** environment, then
+   deploys and verifies `anildwa-uat-workspace`.
+4. After testing in UAT, create a pull request from `uat` into `prod` and complete
+   it. The pipeline does the same for **PROD** and `anildwa-prod-workspace`.
+
+### What the pipeline checks
+
+- **Validate** (no credentials) fails if:
+  - the library has no value set named exactly like the environment;
+  - the value set doesn't override every workspace, lakehouse, or database ID, so
+    it would fall back to the Dev value;
+  - two value sets share the same ID (for example a copy-pasted UAT ID in `prod`);
+  - any notebook, pipeline, lakehouse, or SQL project contains a hard-coded ID; or
+  - a notebook or pipeline references a library variable that doesn't exist.
+- **Deploy** publishes the items, deploys the SQL project schema (fabric-cicd 1.4.0
+  creates SQL databases without their schema; existing data is kept), then
+  **verifies** the workspace and fails if:
+  - the active value set isn't the environment;
+  - any workspace, lakehouse, or database ID in it doesn't belong to the target
+    workspace;
+  - an item references an ID outside the target workspace; or
+  - a pipeline library binding or SQL schema object is missing.
+
+The pipeline only deploys definitions; it doesn't run the copy pipeline or load
+data. Items deleted from Git are not removed from UAT or Prod; delete them manually.
+
+### Deploy only some item types (`items_in_scope`)
+
+Runs triggered by a merge deploy all types:
+`Lakehouse,SQLDatabase,VariableLibrary,Notebook,DataPipeline`. To deploy a subset,
+run the pipeline manually from the `uat` or `prod` branch and edit **Fabric item
+types to deploy**. Items of other types are left unchanged, and any they reference
+must already exist in the target workspace.
+
+### Set up a new environment
+
+A new environment's lakehouse and SQL database must exist before their IDs can be
+added to its value set:
+
+1. Create the workspace, a service principal and service connection for it, and an
+   Azure DevOps environment with an approval check.
+2. Create the lakehouse and SQL database by running the pipeline manually with
+   `items_in_scope` = `Lakehouse,SQLDatabase`.
+3. In the Dev workspace, add a value set named like the environment with the new
+   IDs, commit, and promote as usual.
+
+### Run the checks locally
+
+```powershell
+python -m pip install -r deploy/requirements.txt
+python deploy/deploy.py --environment uat --check-only
+python deploy/deploy.py --environment prod --check-only
+```
+
+### Identity and permissions
+
+| Environment | Workspace | Service connection / principal | Approval |
+|---|---|---|---|
+| UAT | `anildwa-uat-workspace` | `fabric-cicd-uat` / `sp-fabric-cicd-uat` | Azure DevOps environment **UAT** |
+| Prod | `anildwa-prod-workspace` | `fabric-cicd-prod` / `sp-fabric-cicd-prod` | Azure DevOps environment **PROD** |
+
+Each service connection uses workload identity federation (no secret) and has no
+Azure RBAC role. Each service principal is **Contributor** on its own workspace only.
+
+The copy pipeline uses the shared tenant-level connections in
+`CustomerDemographicsConfig`; whoever runs it must be able to use them. To give an
+environment its own connections, override `SourceConnectionId` and
+`DestinationConnectionId` in its value set.

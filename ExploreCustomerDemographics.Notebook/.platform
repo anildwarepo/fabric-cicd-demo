@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Notebook",
+    "displayName": "ExploreCustomerDemographics",
+    "description": "Read shared configuration and preview the four customer demographics ADLS files with Spark."
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "af87dae2-c50d-8f9e-4858-45200d9c787b"
+  }
+}
