@@ -6,23 +6,29 @@
 # META   "kernel_info": {
 # META     "name": "synapse_pyspark"
 # META   },
-# META   "dependencies": {
-# META     "lakehouse": {
-# META       "default_lakehouse": "8340a38b-0be0-4b4d-a360-6492cff7ae66",
-# META       "default_lakehouse_name": "CustomerDemographicsLakehouse",
-# META       "default_lakehouse_workspace_id": "e2ebf2eb-f7df-42a3-b5e3-e033cf7d32c6"
-# META     }
-# META   }
+# META   "dependencies": {}
 # META }
 
 # MARKDOWN ********************
 
 #  Explore customer demographics
 # Read the active `CustomerDemographicsConfig` values and preview the four
-# pipe-delimited ADLS files. This notebook does not copy data or modify tables.
+# pipe-delimited ADLS files. The first code cell attaches the default lakehouse
+# from the library with `%%configure`, so each environment uses its own lakehouse. This notebook does not copy data or modify tables.
 # Direct ADLS reads use the notebook execution identity, not the pipeline's
 # stored connection credentials. That identity needs storage read permission
 # and network access to the ADLS account.
+
+# CELL ********************
+
+# MAGIC %%configure
+# MAGIC {
+# MAGIC     "defaultLakehouse": {
+# MAGIC         "name": {"variableName": "$(/**/CustomerDemographicsConfig/LakehouseName)"},
+# MAGIC         "id": {"variableName": "$(/**/CustomerDemographicsConfig/LakehouseId)"},
+# MAGIC         "workspaceId": {"variableName": "$(/**/CustomerDemographicsConfig/LakehouseWorkspaceId)"}
+# MAGIC     }
+# MAGIC }
 
 # CELL ********************
 
@@ -41,11 +47,27 @@ source_config = {
     "file_pattern": config.SourceFilePattern,
     "lakehouse_workspace_id": config.LakehouseWorkspaceId,
     "lakehouse_id": config.LakehouseId,
+    "lakehouse_name": config.LakehouseName,
 }
 if any(not isinstance(value, str) or not value.strip() for value in source_config.values()):
     raise ValueError("All source and lakehouse configuration values must be nonempty strings.")
 
 display(spark.createDataFrame(sorted(source_config.items()), ["setting", "value"]))
+
+# Fail if the attached default lakehouse isn't the one in the active value set.
+context = notebookutils.runtime.context
+attached = {
+    "id": str(context.get("defaultLakehouseId") or ""),
+    "workspace_id": str(context.get("defaultLakehouseWorkspaceId") or ""),
+    "name": str(context.get("defaultLakehouseName") or ""),
+}
+if (attached["id"].lower(), attached["workspace_id"].lower()) != (
+    source_config["lakehouse_id"].lower(),
+    source_config["lakehouse_workspace_id"].lower(),
+):
+    raise ValueError(f"Attached default lakehouse {attached} does not match the variable library {source_config}.")
+print(f"Default lakehouse: {attached['name']} ({attached['id']}) in workspace {attached['workspace_id']}")
+
 
 # METADATA ********************
 
@@ -138,6 +160,8 @@ notebookutils.notebook.exit(
             "fileCount": len(counts),
             "rowCount": row_count,
             "previewRows": 20,
+            "defaultLakehouseId": attached["id"],
+            "defaultLakehouseWorkspaceId": attached["workspace_id"],
         }
     )
 )

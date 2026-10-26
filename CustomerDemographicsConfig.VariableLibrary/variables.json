@@ -68,6 +68,12 @@
       "note": "CustomerDemographicsLakehouse item ID.",
       "type": "String",
       "value": "8340a38b-0be0-4b4d-a360-6492cff7ae66"
+    },
+    {
+      "name": "LakehouseName",
+      "note": "Default lakehouse attached by the notebook's %%configure cell; same name in every environment.",
+      "type": "String",
+      "value": "CustomerDemographicsLakehouse"
     }
   ]
 }
