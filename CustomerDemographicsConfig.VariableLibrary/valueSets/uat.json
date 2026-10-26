@@ -1,0 +1,22 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/variableLibrary/definition/valueSet/1.0.0/schema.json",
+  "name": "uat",
+  "variableOverrides": [
+    {
+      "name": "DestinationWorkspaceId",
+      "value": "af368112-6272-4016-b950-1ec72eeaa87c"
+    },
+    {
+      "name": "DestinationDatabaseId",
+      "value": "7da6ebb8-af66-48c9-8834-fd2ad64b0e41"
+    },
+    {
+      "name": "LakehouseWorkspaceId",
+      "value": "af368112-6272-4016-b950-1ec72eeaa87c"
+    },
+    {
+      "name": "LakehouseId",
+      "value": "20803294-c2d6-435d-ab7e-8f11616e3551"
+    }
+  ]
+}
