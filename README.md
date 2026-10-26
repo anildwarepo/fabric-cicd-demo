@@ -164,6 +164,12 @@ IDs are replaced during deployment, and there is no `parameter.yml`.
 The pipeline only deploys definitions; it doesn't run the copy pipeline or load
 data. Items deleted from Git are not removed from UAT or Prod; delete them manually.
 
+The ADLS account `anildwafabricadlsgen2` has public network access disabled. Only
+the Dev workspace currently has a network path to it, so the UAT and Prod notebooks
+attach their own lakehouse but fail to read the `.dat` files with
+`403 AuthorizationFailure` until each workspace is given access (for example a
+managed private endpoint approved on the storage account).
+
 ### Deploy only some item types (`items_in_scope`)
 
 Runs triggered by a merge deploy all types:
