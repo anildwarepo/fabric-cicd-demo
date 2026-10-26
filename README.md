@@ -24,10 +24,13 @@ the exploration lakehouse IDs. The pipeline binds its source and destination
 variables using `@pipeline().libraryVariables.<name>`; the notebook reads its
 configuration using `notebookutils.variableLibrary.getLibrary`.
 
-The values in Git target this development workspace. When the items are promoted,
-[deploy/parameter.yml](./deploy/parameter.yml) rewrites the workspace, SQL database,
-and lakehouse IDs for the target environment (see CI/CD below). Credentials remain
-in Fabric connections, not in the variable library or Git.
+The library has one value set per environment. The **Default value set** holds the
+Dev values; the `uat` and `prod` value sets override every workspace, lakehouse,
+and SQL database ID with that environment's ID. Each workspace activates its own
+value set, so items read the right IDs without any change to their definitions
+(see CI/CD below). The connection IDs are tenant-level and shared by all
+environments. Credentials remain in Fabric connections, not in the variable
+library or Git.
 
 ### Destination and execution
 
@@ -62,8 +65,10 @@ created instead, update their IDs in the variable library before rerunning.
 ## Explore the source with Spark
 
 [ExploreCustomerDemographics](./ExploreCustomerDemographics.Notebook/notebook-content.py)
-is a PySpark notebook attached to
-[CustomerDemographicsLakehouse](./CustomerDemographicsLakehouse.Lakehouse/).
+is a PySpark notebook. Its first cell uses `%%configure` to attach
+[CustomerDemographicsLakehouse](./CustomerDemographicsLakehouse.Lakehouse/) as the
+default lakehouse, reading the lakehouse name, ID, and workspace ID from
+`CustomerDemographicsConfig`, so each environment attaches its own lakehouse.
 Open the notebook in Fabric and select **Run all**. It:
 
 1. Reads and displays the active source and lakehouse settings from
@@ -74,7 +79,8 @@ Open the notebook in Fabric and select **Run all**. It:
 4. Displays per-file row counts, the total row count, and the first 20 rows ordered
    by `cd_demo_sk`.
 5. Exposes the DataFrame as the session-local Spark SQL view
-   `customer_demographics_preview` and returns a JSON execution summary.
+   `customer_demographics_preview` and returns a JSON execution summary that
+   includes the attached default lakehouse.
 
 The notebook reads ADLS directly using its execution identity; it does not use
 the pipeline's stored OAuth connection, and it does not modify the SQL database
@@ -87,119 +93,116 @@ The initial Spark validation completed successfully with four files and
 1,920,800 rows. Saved run snapshots retain the displayed configuration, per-file
 counts, and 20-row preview; open the notebook's run history to inspect them.
 
-## CI/CD: promote to UAT with fabric-cicd
+## CI/CD: promote to UAT and Prod with fabric-cicd
 
-Items are promoted from Git to `anildwa-uat-workspace` by an Azure Pipeline that
-uses the [fabric-cicd](https://microsoft.github.io/fabric-cicd/) library. UAT has
-its own lakehouse and SQL database; it is not Git-connected.
+Items are promoted from Git by one Azure Pipeline that uses the
+[fabric-cicd](https://microsoft.github.io/fabric-cicd/) library. Each environment has
+its own workspace, lakehouse, and SQL database. Only the Dev workspace is connected to
+Git.
 
 ```text
-anildwa-dev-workspace --(Fabric Source control: Commit)--> branch anildwa-fabric-dev
-        --(pull request)--> branch uat --(Azure Pipeline + approval)--> anildwa-uat-workspace
+anildwa-dev-workspace --(Fabric Source control: Commit)--> branch dev
+    --(pull request)--> branch uat  --(pipeline + UAT approval)-->  anildwa-uat-workspace
+    --(pull request)--> branch prod --(pipeline + PROD approval)--> anildwa-prod-workspace
 ```
 
 | File | Purpose |
 |---|---|
-| [deploy/azure-pipelines-uat.yml](./deploy/azure-pipelines-uat.yml) | Azure Pipeline `fabric-cicd-deploy-uat`; triggered by commits to `uat`; `items_in_scope` parameter |
-| [deploy/deploy.py](./deploy/deploy.py) | Static check, phased publish (including SQL schema), and post-deploy verification |
-| [deploy/parameter.yml](./deploy/parameter.yml) | Rewrites Dev IDs to the UAT workspace and its deployed items |
+| [deploy/azure-pipelines.yml](./deploy/azure-pipelines.yml) | Azure Pipeline `fabric-cicd-deploy`; runs on commits to `uat` and `prod` |
+| [deploy/deploy.py](./deploy/deploy.py) | Static check, publish, SQL schema deployment, and verification |
 | [deploy/requirements.txt](./deploy/requirements.txt) | Pinned deployment dependencies |
 
-### Release a change to UAT
+### How environment values work
 
-1. Develop and test in `anildwa-dev-workspace`.
-2. In Fabric, open **Source control** and commit the changed items to
-   `anildwa-fabric-dev`.
-3. In Azure DevOps, create a pull request from `anildwa-fabric-dev` into `uat`
-   and complete it.
-4. The pipeline runs **Validate**, then waits for approval on the **UAT**
-   environment. Approve it under **Pipelines > Environments > UAT** or from the run.
-5. **Deploy to UAT** publishes and verifies the items. Review the run log.
+Environment-specific values live **only** in the variable library's value sets. No
+IDs are replaced during deployment, and there is no `parameter.yml`.
 
-### What the pipeline does
+| Value set | Used in | Holds |
+|---|---|---|
+| Default value set | `anildwa-dev-workspace` | Dev IDs |
+| `uat` | `anildwa-uat-workspace` | UAT IDs |
+| `prod` | `anildwa-prod-workspace` | Prod IDs |
 
-- **Validate** (no credentials): fails if a `parameter.yml` entry no longer matches
-  the repository, or if any item contains an ID that is not rewritten, so a Dev
-  reference cannot leak into UAT.
-- **Deploy to UAT**, phase 1: publishes `Lakehouse` and `SQLDatabase`. fabric-cicd
-  creates these as shells; lakehouse data is never copied or overwritten.
-- **Deploy to UAT**, phase 1b: deploys each SQL project (for example
-  `dbo.customer_demographics`) with the Fabric `updateDefinition` API in `sqlproj`
-  format, because fabric-cicd 1.4.0 does not publish SQL database definitions.
-  Fabric builds the project and applies a differential update; existing UAT data
-  is kept. If Fabric rejects a change that would lose data, the run fails and the
-  change must be applied manually.
-- **Deploy to UAT**, phase 2: publishes `VariableLibrary`, `Notebook`, and
-  `DataPipeline`. The two phases exist because fabric-cicd publishes variable
-  libraries first, and `$items` references resolve only to items that already
-  exist in the target workspace.
-- **Verify**: reads the deployed definitions back and fails if any item references
-  an ID outside the UAT workspace (other than the shared connection IDs), if the
-  notebook is not bound to the UAT lakehouse, if a pipeline library binding is
-  unresolved, or if a SQL schema object is missing.
+- The pipeline passes the branch name (`uat` or `prod`) to fabric-cicd, which
+  activates the value set with exactly that name. Names are case-sensitive; if no
+  value set matches, fabric-cicd would silently activate the Default value set, so
+  the static check fails instead.
+- The copy pipeline reads its IDs through `@pipeline().libraryVariables`, and the
+  notebook reads them with `notebookutils.variableLibrary` and `%%configure`. Neither
+  definition contains an ID.
 
-In UAT, `CustomerDemographicsConfig` keeps the **Default value set** active, and its
-values point to the UAT workspace, SQL database, and lakehouse. The notebook's
-default lakehouse is the UAT `CustomerDemographicsLakehouse`.
+### Release a change
 
-The pipeline only deploys definitions; it does not run the UAT copy pipeline or
-load data. Items deleted from Git are not removed from UAT (orphan cleanup is
-intentionally disabled); delete them in UAT manually if needed.
+1. Develop and test in `anildwa-dev-workspace`. If you add a workspace, lakehouse,
+   or SQL database ID to the library, add its UAT and Prod values to the `uat` and
+   `prod` value sets.
+2. In Fabric, open **Source control** and commit to `dev`.
+3. In Azure DevOps, create a pull request from `dev` into `uat` and complete it.
+   The pipeline validates, waits for approval on the **UAT** environment, then
+   deploys and verifies `anildwa-uat-workspace`.
+4. After testing in UAT, create a pull request from `uat` into `prod` and complete
+   it. The pipeline does the same for **PROD** and `anildwa-prod-workspace`.
+
+### What the pipeline checks
+
+- **Validate** (no credentials) fails if:
+  - the library has no value set named exactly like the environment;
+  - the value set doesn't override every workspace, lakehouse, or database ID, so
+    it would fall back to the Dev value;
+  - two value sets share the same ID (for example a copy-pasted UAT ID in `prod`);
+  - any notebook, pipeline, lakehouse, or SQL project contains a hard-coded ID; or
+  - a notebook or pipeline references a library variable that doesn't exist.
+- **Deploy** publishes the items, deploys the SQL project schema (fabric-cicd 1.4.0
+  creates SQL databases without their schema; existing data is kept), then
+  **verifies** the workspace and fails if:
+  - the active value set isn't the environment;
+  - any workspace, lakehouse, or database ID in it doesn't belong to the target
+    workspace;
+  - an item references an ID outside the target workspace; or
+  - a pipeline library binding or SQL schema object is missing.
+
+The pipeline only deploys definitions; it doesn't run the copy pipeline or load
+data. Items deleted from Git are not removed from UAT or Prod; delete them manually.
 
 ### Deploy only some item types (`items_in_scope`)
 
-The pipeline has an `items_in_scope` parameter: a comma-separated list of item
-types to deploy. The default deploys all of them:
+Runs triggered by a merge deploy all types:
+`Lakehouse,SQLDatabase,VariableLibrary,Notebook,DataPipeline`. To deploy a subset,
+run the pipeline manually from the `uat` or `prod` branch and edit **Fabric item
+types to deploy**. Items of other types are left unchanged, and any they reference
+must already exist in the target workspace.
 
-```text
-Lakehouse,SQLDatabase,VariableLibrary,Notebook,DataPipeline
-```
+### Set up a new environment
 
-Runs triggered by a merge into `uat` always use the default. To deploy a subset,
-start the pipeline manually: **Pipelines > fabric-cicd-deploy-uat > Run pipeline**,
-select the `uat` branch, and edit **Fabric item types to deploy**.
+A new environment's lakehouse and SQL database must exist before their IDs can be
+added to its value set:
 
-- Validation, publishing, and verification apply only to the selected types.
-  Phases with no selected type are skipped.
-- Items of other types are left unchanged in UAT. If a selected item references
-  one (for example a notebook's default lakehouse), it must already exist in UAT;
-  validation warns about this and publishing fails if it is missing.
-- Pipeline library bindings are checked against the variable library already in
-  UAT when `VariableLibrary` is not selected.
-- Excluding `VariableLibrary` keeps the UAT library's current values, but changes
-  to its variables in Git are not deployed until it is included again.
-- Only the five types above are supported. Unknown types fail validation; to add
-  one, see "Add another item or environment" below.
+1. Create the workspace, a service principal and service connection for it, and an
+   Azure DevOps environment with an approval check.
+2. Create the lakehouse and SQL database by running the pipeline manually with
+   `items_in_scope` = `Lakehouse,SQLDatabase`.
+3. In the Dev workspace, add a value set named like the environment with the new
+   IDs, commit, and promote as usual.
 
 ### Run the checks locally
 
 ```powershell
 python -m pip install -r deploy/requirements.txt
-python deploy/deploy.py --environment UAT --check-only
-python deploy/deploy.py --environment UAT --check-only --items-in-scope Notebook,DataPipeline
+python deploy/deploy.py --environment uat --check-only
+python deploy/deploy.py --environment prod --check-only
 ```
 
 ### Identity and permissions
 
-| Resource | Configuration |
-|---|---|
-| Service connection | `fabric-cicd-uat` (Azure Resource Manager, workload identity federation, management-group scope) |
-| Service principal | `sp-fabric-cicd-uat`; no client secret or certificate; no Azure RBAC role |
-| Fabric access | **Contributor** on `anildwa-uat-workspace` only; no access to Dev |
-| Approval | Azure DevOps environment **UAT** requires approval before deployment |
+| Environment | Workspace | Service connection / principal | Approval |
+|---|---|---|---|
+| UAT | `anildwa-uat-workspace` | `fabric-cicd-uat` / `sp-fabric-cicd-uat` | Azure DevOps environment **UAT** |
+| Prod | `anildwa-prod-workspace` | `fabric-cicd-prod` / `sp-fabric-cicd-prod` | Azure DevOps environment **PROD** |
 
-The UAT copy pipeline reuses the tenant-level connections in
-`CustomerDemographicsConfig`. Whoever runs it in UAT must be able to use those
-connections. To give UAT its own connections, add `key_value_replace` entries for
-`SourceConnectionId` and `DestinationConnectionId` in `deploy/parameter.yml`.
+Each service connection uses workload identity federation (no secret) and has no
+Azure RBAC role. Each service principal is **Contributor** on its own workspace only.
 
-### Add another item or environment
-
-- **New item in an existing type**: commit it from Fabric. If the static check
-  reports an unparameterized ID, add a `parameter.yml` entry for it.
-- **New item type**: add it to `INFRASTRUCTURE_TYPES` (items that others reference)
-  or `CONTENT_TYPES` in `deploy/deploy.py`, and to the `items_in_scope` default in
-  `deploy/azure-pipelines-uat.yml`.
-- **New environment** (for example PROD): add the environment key to every
-  `replace_value` in `deploy/parameter.yml`, then create a matching pipeline,
-  branch, service connection, and approval environment.
+The copy pipeline uses the shared tenant-level connections in
+`CustomerDemographicsConfig`; whoever runs it must be able to use them. To give an
+environment its own connections, override `SourceConnectionId` and
+`DestinationConnectionId` in its value set.
