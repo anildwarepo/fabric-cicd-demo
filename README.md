@@ -100,7 +100,7 @@ anildwa-dev-workspace --(Fabric Source control: Commit)--> branch anildwa-fabric
 
 | File | Purpose |
 |---|---|
-| [deploy/azure-pipelines-uat.yml](./deploy/azure-pipelines-uat.yml) | Azure Pipeline `fabric-cicd-deploy-uat`; triggered by commits to `uat` |
+| [deploy/azure-pipelines-uat.yml](./deploy/azure-pipelines-uat.yml) | Azure Pipeline `fabric-cicd-deploy-uat`; triggered by commits to `uat`; `items_in_scope` parameter |
 | [deploy/deploy.py](./deploy/deploy.py) | Static check, phased publish (including SQL schema), and post-deploy verification |
 | [deploy/parameter.yml](./deploy/parameter.yml) | Rewrites Dev IDs to the UAT workspace and its deployed items |
 | [deploy/requirements.txt](./deploy/requirements.txt) | Pinned deployment dependencies |
@@ -146,11 +146,37 @@ The pipeline only deploys definitions; it does not run the UAT copy pipeline or
 load data. Items deleted from Git are not removed from UAT (orphan cleanup is
 intentionally disabled); delete them in UAT manually if needed.
 
+### Deploy only some item types (`items_in_scope`)
+
+The pipeline has an `items_in_scope` parameter: a comma-separated list of item
+types to deploy. The default deploys all of them:
+
+```text
+Lakehouse,SQLDatabase,VariableLibrary,Notebook,DataPipeline
+```
+
+Runs triggered by a merge into `uat` always use the default. To deploy a subset,
+start the pipeline manually: **Pipelines > fabric-cicd-deploy-uat > Run pipeline**,
+select the `uat` branch, and edit **Fabric item types to deploy**.
+
+- Validation, publishing, and verification apply only to the selected types.
+  Phases with no selected type are skipped.
+- Items of other types are left unchanged in UAT. If a selected item references
+  one (for example a notebook's default lakehouse), it must already exist in UAT;
+  validation warns about this and publishing fails if it is missing.
+- Pipeline library bindings are checked against the variable library already in
+  UAT when `VariableLibrary` is not selected.
+- Excluding `VariableLibrary` keeps the UAT library's current values, but changes
+  to its variables in Git are not deployed until it is included again.
+- Only the five types above are supported. Unknown types fail validation; to add
+  one, see "Add another item or environment" below.
+
 ### Run the checks locally
 
 ```powershell
 python -m pip install -r deploy/requirements.txt
 python deploy/deploy.py --environment UAT --check-only
+python deploy/deploy.py --environment UAT --check-only --items-in-scope Notebook,DataPipeline
 ```
 
 ### Identity and permissions
@@ -172,7 +198,8 @@ connections. To give UAT its own connections, add `key_value_replace` entries fo
 - **New item in an existing type**: commit it from Fabric. If the static check
   reports an unparameterized ID, add a `parameter.yml` entry for it.
 - **New item type**: add it to `INFRASTRUCTURE_TYPES` (items that others reference)
-  or `CONTENT_TYPES` in `deploy/deploy.py`.
+  or `CONTENT_TYPES` in `deploy/deploy.py`, and to the `items_in_scope` default in
+  `deploy/azure-pipelines-uat.yml`.
 - **New environment** (for example PROD): add the environment key to every
   `replace_value` in `deploy/parameter.yml`, then create a matching pipeline,
   branch, service connection, and approval environment.

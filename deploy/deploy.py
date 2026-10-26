@@ -12,9 +12,13 @@ resolve to items that already exist in the target workspace.
 After publishing, the deployed definitions are read back and the run fails if any
 item still references an ID outside the target workspace.
 
+--items-in-scope limits the deployment to some item types. Phases with no in-scope
+type are skipped, and out-of-scope items must already exist in the target workspace.
+
 Usage:
     python deploy/deploy.py --environment UAT --check-only
     python deploy/deploy.py --environment UAT --workspace-id <target-workspace-id>
+    python deploy/deploy.py --environment UAT --workspace-id <id> --items-in-scope Notebook,DataPipeline
 """
 
 import argparse
@@ -36,6 +40,7 @@ ZERO_GUID = "00000000-0000-0000-0000-000000000000"
 INFRASTRUCTURE_TYPES = ["Lakehouse", "SQLDatabase"]
 CONTENT_TYPES = ["VariableLibrary", "Notebook", "DataPipeline"]
 ITEM_TYPES = INFRASTRUCTURE_TYPES + CONTENT_TYPES
+ITEM_REFERENCE = re.compile(r"\$items\.([A-Za-z]+)\.")
 
 # Library variables holding tenant-level connection IDs, shared across environments.
 CONNECTION_VARIABLES = {"SourceConnectionId", "DestinationConnectionId"}
@@ -54,12 +59,33 @@ def log_error(message):
         print(f"ERROR: {message}", file=sys.stderr)
 
 
-def repository_items(repository_directory):
-    """Map (item type, display name) to the item folder for every in-scope item."""
+def log_warning(message):
+    if os.environ.get("TF_BUILD"):
+        print(f"##vso[task.logissue type=warning]{message}")
+    else:
+        print(f"WARNING: {message}")
+
+
+def parse_items_in_scope(value):
+    """Parse a comma-separated item type list into ITEM_TYPES order."""
+    requested = [part.strip() for part in value.split(",") if part.strip()]
+    unknown = sorted(set(requested) - set(ITEM_TYPES))
+    if unknown:
+        raise DeploymentError(
+            f"Unsupported item type(s) in items_in_scope: {', '.join(unknown)}. Supported: {', '.join(ITEM_TYPES)}. "
+            "To support another type, add it to INFRASTRUCTURE_TYPES or CONTENT_TYPES in deploy/deploy.py."
+        )
+    if not requested:
+        raise DeploymentError("items_in_scope must contain at least one item type.")
+    return [item_type for item_type in ITEM_TYPES if item_type in requested]
+
+
+def repository_items(repository_directory, item_types=ITEM_TYPES):
+    """Map (item type, display name) to the item folder for every item of the given types."""
     items = {}
     for platform_file in sorted(repository_directory.glob("*/.platform")):
         metadata = json.loads(platform_file.read_text(encoding="utf-8-sig"))["metadata"]
-        if metadata["type"] in ITEM_TYPES:
+        if metadata["type"] in item_types:
             items[(metadata["type"], metadata["displayName"])] = platform_file.parent
     return items
 
@@ -74,21 +100,28 @@ def content_files(folder):
     return [path for path in sorted(folder.rglob("*")) if path.is_file() and path.name != ".platform"]
 
 
-def check_repository(repository_directory, parameter_file, environment):
+def entry_in_scope(entry, item_types):
+    """True if a parameter entry can apply to at least one in-scope item type."""
+    return entry.get("item_type") is None or any(matches_filter(t, entry["item_type"]) for t in item_types)
+
+
+def check_repository(repository_directory, parameter_file, environment, item_types=ITEM_TYPES):
     """Validate parameterization statically, without credentials.
 
     Fails when a parameter entry no longer matches the repository (for example the
     Dev lakehouse was recreated with a new ID), or when an item contains a GUID that
     no parameter entry rewrites, which would leak a Dev reference into the target.
+    Only item types in item_types are checked.
     """
     from jsonpath_ng.ext import parse as jsonpath_parse
 
     errors = []
-    items = repository_items(repository_directory)
+    items = repository_items(repository_directory, item_types)
+    print(f"Item types in scope: {', '.join(item_types)}")
     print(f"Repository items in scope ({len(items)}):")
     for (item_type, name), folder in items.items():
         print(f"  {item_type:16} {name}  [{folder.name}]")
-    for item_type in ITEM_TYPES:
+    for item_type in item_types:
         if not any(key[0] == item_type for key in items):
             errors.append(f"No {item_type} item found in {repository_directory}.")
 
@@ -98,10 +131,12 @@ def check_repository(repository_directory, parameter_file, environment):
         errors.append(f"Unsupported parameter sections for this check: {sorted(unsupported)}")
 
     covered = {}  # file path -> set of GUIDs rewritten by a parameter entry
+    dependencies = set()  # item types referenced through $items by in-scope entries
 
     def targets(entry, label):
         if environment not in (entry.get("replace_value") or {}):
             errors.append(f"{label}: replace_value has no '{environment}' entry.")
+        dependencies.update(ITEM_REFERENCE.findall(str((entry.get("replace_value") or {}).get(environment, ""))))
         selected = [
             folder
             for (item_type, name), folder in items.items()
@@ -112,6 +147,8 @@ def check_repository(repository_directory, parameter_file, environment):
         return selected
 
     for index, entry in enumerate(parameters.get("find_replace") or []):
+        if not entry_in_scope(entry, item_types):
+            continue
         label = f"find_replace[{index}] '{entry.get('find_value')}'"
         found = False
         for folder in targets(entry, label):
@@ -123,6 +160,8 @@ def check_repository(repository_directory, parameter_file, environment):
             errors.append(f"{label}: value not found in the targeted items; the Dev reference may have changed.")
 
     for index, entry in enumerate(parameters.get("key_value_replace") or []):
+        if not entry_in_scope(entry, item_types):
+            continue
         label = f"key_value_replace[{index}] {entry.get('find_key')}"
         expression = jsonpath_parse(entry["find_key"])
         found = False
@@ -153,6 +192,12 @@ def check_repository(repository_directory, parameter_file, environment):
                     f"unparameterized ID {guid}; add a parameter.yml entry for it."
                 )
 
+    for item_type in sorted(dependencies - set(item_types)):
+        log_warning(
+            f"In-scope items reference {item_type} items, which are out of scope. "
+            f"They must already exist in the target workspace, or the deployment fails."
+        )
+
     if errors:
         for error in errors:
             log_error(error)
@@ -169,12 +214,7 @@ def phase_parameters(parameter_file, item_types):
     parameters = yaml.safe_load(parameter_file.read_text(encoding="utf-8")) or {}
     filtered = {}
     for section, entries in parameters.items():
-        kept = [
-            entry
-            for entry in entries or []
-            if entry.get("item_type") is None
-            or any(matches_filter(item_type, entry["item_type"]) for item_type in item_types)
-        ]
+        kept = [entry for entry in entries or [] if entry_in_scope(entry, item_types)]
         if kept:
             filtered[section] = kept
     return filtered
@@ -304,7 +344,7 @@ def verify(args, credential):
     allowed = {workspace_id, ZERO_GUID} | set(by_key.values())
 
     errors = []
-    expected = repository_items(args.repository_directory)
+    expected = repository_items(args.repository_directory, args.item_types)
     for item_type, name in expected:
         if (item_type, name) not in by_key:
             errors.append(f"{item_type} '{name}' was not found in the target workspace.")
@@ -318,13 +358,24 @@ def verify(args, credential):
         definition_format = "sqlproj" if item_type == "SQLDatabase" else None
         definitions[(item_type, name)] = client.definition(workspace_id, by_key[(item_type, name)], definition_format)
 
+    # Out-of-scope libraries bound by in-scope pipelines are read from the target workspace.
+    libraries = {key[1]: parts for key, parts in definitions.items() if key[0] == "VariableLibrary"}
     for (item_type, name), parts in definitions.items():
-        if item_type != "VariableLibrary":
+        if item_type != "DataPipeline":
             continue
+        bindings = json.loads(parts["pipeline-content.json"])["properties"].get("libraryVariables") or {}
+        for library_name in {binding["libraryName"] for binding in bindings.values()} - set(libraries):
+            if ("VariableLibrary", library_name) in by_key:
+                libraries[library_name] = client.definition(workspace_id, by_key[("VariableLibrary", library_name)])
+
+    for name, parts in sorted(libraries.items()):
         variables = {v["name"]: v["value"] for v in json.loads(parts["variables.json"])["variables"]}
         allowed |= {str(variables[v]).lower() for v in CONNECTION_VARIABLES if v in variables}
+        if ("VariableLibrary", name) not in definitions:
+            print(f"  VariableLibrary '{name}': out of scope; read from the target workspace for binding checks")
+            continue
         library = client.request(
-            "GET", f"{FABRIC_API}/workspaces/{workspace_id}/variableLibraries/{by_key[(item_type, name)]}"
+            "GET", f"{FABRIC_API}/workspaces/{workspace_id}/variableLibraries/{by_key[('VariableLibrary', name)]}"
         ).json()
         print(f"  VariableLibrary '{name}': active value set '{library['properties'].get('activeValueSetName')}'")
         for variable, value in sorted(variables.items()):
@@ -349,13 +400,15 @@ def verify(args, credential):
                         errors.append(f"Notebook '{name}' is not bound to a lakehouse in the target workspace.")
         elif item_type == "DataPipeline":
             content = json.loads(parts["pipeline-content.json"])
-            libraries = {key[1]: definitions[key] for key in definitions if key[0] == "VariableLibrary"}
-            for alias, binding in (content["properties"].get("libraryVariables") or {}).items():
+            bindings = content["properties"].get("libraryVariables") or {}
+            unresolved = 0
+            for alias, binding in bindings.items():
                 library_parts = libraries.get(binding["libraryName"])
                 names = {v["name"] for v in json.loads(library_parts["variables.json"])["variables"]} if library_parts else set()
                 if binding["variableName"] not in names:
+                    unresolved += 1
                     errors.append(f"DataPipeline '{name}' binds {alias} to missing {binding['libraryName']}.{binding['variableName']}.")
-            print(f"  DataPipeline '{name}': {len(content['properties'].get('libraryVariables') or {})} library variable bindings resolved")
+            print(f"  DataPipeline '{name}': {len(bindings) - unresolved}/{len(bindings)} library variable bindings resolved")
         elif item_type == "SQLDatabase":
             source_folder = expected[(item_type, name)]
             source_objects = {
@@ -383,12 +436,18 @@ def main():
     parser.add_argument("--repository-directory", type=Path, default=REPO_ROOT)
     parser.add_argument("--parameter-file", type=Path, default=Path(__file__).resolve().parent / "parameter.yml")
     parser.add_argument("--check-only", action="store_true", help="Run the static check only; no credentials needed.")
+    parser.add_argument(
+        "--items-in-scope",
+        default=",".join(ITEM_TYPES),
+        help=f"Comma-separated item types to deploy (default: all). Supported: {', '.join(ITEM_TYPES)}.",
+    )
     args = parser.parse_args()
     args.repository_directory = args.repository_directory.resolve()
     args.parameter_file = args.parameter_file.resolve()
 
     try:
-        check_repository(args.repository_directory, args.parameter_file, args.environment)
+        args.item_types = parse_items_in_scope(args.items_in_scope)
+        check_repository(args.repository_directory, args.parameter_file, args.environment, args.item_types)
         if args.check_only:
             return 0
         if not args.workspace_id or not GUID.fullmatch(args.workspace_id):
@@ -397,9 +456,14 @@ def main():
         from azure.identity import AzureCliCredential
 
         credential = AzureCliCredential()
-        publish("1/2", INFRASTRUCTURE_TYPES, args, credential)
-        deploy_sql_schema(args, credential)
-        publish("2/2", CONTENT_TYPES, args, credential)
+        infrastructure = [t for t in INFRASTRUCTURE_TYPES if t in args.item_types]
+        content = [t for t in CONTENT_TYPES if t in args.item_types]
+        if infrastructure:
+            publish("1/2", infrastructure, args, credential)
+        if "SQLDatabase" in args.item_types:
+            deploy_sql_schema(args, credential)
+        if content:
+            publish("2/2", content, args, credential)
         verify(args, credential)
     except DeploymentError as error:
         log_error(str(error))
