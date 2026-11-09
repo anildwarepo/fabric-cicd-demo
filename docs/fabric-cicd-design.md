@@ -5,6 +5,10 @@ and Prod with Azure DevOps and [fabric-cicd](https://microsoft.github.io/fabric-
 why it is designed this way. It reflects the working setup in this repository and the
 lessons from fixing variable library values that were overwritten during deployment.
 
+For the step-by-step tenant settings, workspace permissions, federated Azure DevOps
+service connections, and approval setup, see
+[Connect Azure DevOps to Fabric](../README.md#connect-azure-devops-to-fabric).
+
 ## Design principles
 
 1. **One workspace per environment.** Dev, UAT, and Prod each have their own lakehouse and
@@ -38,7 +42,9 @@ lessons from fixing variable library values that were overwritten during deploym
   reads `Build.SourceBranchName` and picks the environment, workspace, service connection,
   and approval environment. Runs from any other branch fail.
 - **Least privilege.** Each service principal uses workload identity federation (no secret),
-  has no Azure RBAC role, and is **Contributor** on its own workspace only.
+  and is **Contributor** on its own workspace only. Fabric API authorization does not use
+  Azure subscription RBAC; a subscription-scoped Azure DevOps service connection can
+  separately require read access for its Azure CLI login.
 
 ## 2. Variable library value sets
 
